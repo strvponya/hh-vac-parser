@@ -1,11 +1,14 @@
 import asyncio
+import os
+from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 import requests
 from urllib.parse import quote
 
-TOKEN = "8775253083:AAEZvlstjmUYLVHyL0wIrh3g6zZ_fcj7UQ4"
+load_dotenv()
+TOKEN = os.getenv("TOKEN")
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
@@ -18,7 +21,7 @@ cities = {
     "Казань": "88"
 }
 
-# словарь для хранения состояния пользователя - что он ищет
+
 user_data = {}
 
 
@@ -28,7 +31,7 @@ city_keyboard = ReplyKeyboardMarkup(
         [KeyboardButton(text="Новосибирск"), KeyboardButton(text="Екатеринбург")],
         [KeyboardButton(text="Казань")]
     ],
-    resize_keyboard=True  # подгоняет размер кнопок под экран
+    resize_keyboard=True  
 )
 
 @dp.message(Command("start"))
@@ -78,7 +81,6 @@ async def get_vacancies(message: types.Message):
 
 @dp.message()
 async def ask_city(message: types.Message):
-    # сохраняем ключевое слово пользователя
     user_data[message.from_user.id] = message.text
     await message.answer("Выбери город:", reply_markup=city_keyboard)
 
