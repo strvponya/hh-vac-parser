@@ -13,6 +13,13 @@ TOKEN = os.getenv("TOKEN")
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 counts = ["5", "10", "15", "20", "50"]
+exp = ["Без опыта", "От 1 до 3 лет", "От 3 до 6 лет", "Более 6 лет"]
+exp_map = {
+    "Без опыта": "noExperience",
+    "От 1 до 3 лет": "between1And3",
+    "От 3 до 6 лет": "between3And6",
+    "Более 6 лет": "moreThan6"
+}
 cities = {
     "москва": "1",
     "питер": "2",
@@ -41,7 +48,13 @@ number_keyboard = ReplyKeyboardMarkup(
     ],
     resize_keyboard=True  
 )
-
+exp_keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="Без опыта"), KeyboardButton(text="От 1 до 3 лет")],
+        [KeyboardButton(text="От 3 до 6 лет"), KeyboardButton(text="Более 6 лет")]
+    ],
+    resize_keyboard=True  
+)
 @dp.message(Command("start"))
 async def start(message: types.Message):
     await message.answer("Привет! Напиши ключевое слово для поиска вакансий")
@@ -64,10 +77,18 @@ async def get_vacancies(message:types.Message):
     count = int(message.text)
     keyword = user_data[user_id]["keyword"]
     area = user_data[user_id]["area"]
+    user_data[user_id]["count"] = int(message.text)
+    await message.answer("Укажите опыт работы",reply_markup=exp_keyboard)
+@dp.message(F.text.in_(exp))
+async def get_exp(message:types.Message):
+    user_id = message.from_user.id
+    experience = exp_map[message.text]
+    count = user_data[user_id]["count"]
+    keyword = user_data[user_id]["keyword"]
+    area = user_data[user_id]["area"]
 
-
-    
-    url = f"https://api.hh.ru/vacancies?text={quote(keyword)}&area={area}&search_field=name"
+    url = f"https://api.hh.ru/vacancies?text={quote(keyword)}&area={area}&experience={experience}&search_field=name"
+   
     headers = {"User-Agent": "Mozilla/5.0"}
     
     response = requests.get(url, headers=headers)
