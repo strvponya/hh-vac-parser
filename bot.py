@@ -14,11 +14,11 @@ bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 cities = {
-    "Москва": "1",
-    "Питер": "2",
-    "Новосибирск": "4",
-    "Екатеринбург": "3",
-    "Казань": "88"
+    "москва": "1",
+    "питер": "2",
+    "новосибирск": "4",
+    "екатеринбург": "3",
+    "казань": "88"
 }
 
 
@@ -38,21 +38,28 @@ city_keyboard = ReplyKeyboardMarkup(
 async def start(message: types.Message):
     await message.answer("Привет! Напиши ключевое слово для поиска вакансий")
 
-@dp.message(F.text.in_(cities.keys()))
+@dp.message(Command("help"))
+async def help_сommand(message: types.Message):
+    await message.answer("Данный бот позволяет найти нужную вакансию на hh.ru. Для этого вам нужно ввести команду /start, ввести ключевое слово (Например: Python) и выбрать нужный город")
+
+@dp.message(F.text.lower().in_(cities.keys()))
 async def get_vacancies(message: types.Message):
     user_id = message.from_user.id
     if user_id not in user_data:
         await message.answer("Сначала введи ключевое слово для поиска")
         return
-    
+
     keyword = user_data[user_id]
-    area = cities[message.text]
+    area = cities[message.text.lower()]
     
-    url = f"https://api.hh.ru/vacancies?text={quote(keyword)}&area={area}"
+    url = f"https://api.hh.ru/vacancies?text={quote(keyword)}&area={area}&search_field=name"
     headers = {"User-Agent": "Mozilla/5.0"}
     
     response = requests.get(url, headers=headers)
     data = response.json()
+    if not data["items"]:
+        await message.answer("Вакансий не найдено.Попробуйте ввести другое ключевое слово.")
+        return
     
     result = ""
     for vacancy in data["items"][:5]:
@@ -81,8 +88,11 @@ async def get_vacancies(message: types.Message):
 
 @dp.message()
 async def ask_city(message: types.Message):
+    if message.text.lower() in cities :
+        await message.answer("Выберите город из кнопок ниже:", reply_markup=city_keyboard)
+        return
     user_data[message.from_user.id] = message.text
-    await message.answer("Выбери город:", reply_markup=city_keyboard)
+    await message.answer("Выберите город:", reply_markup=city_keyboard )
 
 async def main():
     await dp.start_polling(bot)
