@@ -6,6 +6,8 @@ from aiogram.filters import Command
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 import requests
 from urllib.parse import quote
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import CallbackQuery
 
 load_dotenv()
 TOKEN = os.getenv("TOKEN")
@@ -31,7 +33,14 @@ cities = {
 
 user_data = {}
 
-
+PAGE_SIZE = 5
+def get_pagination_keyboard(page: int, total_pages: int):
+    buttons=[]
+    if page > 0:
+        buttons.append(InlineKeyboardButton(text="⬅️ Назад", callback_data=f"page_{page-1}"))
+    if page < total_pages - 1:
+        buttons.append(InlineKeyboardButton(text="Вперёд ➡️", callback_data=f"page_{page+1}"))
+    return InlineKeyboardMarkup(inline_keyboard=[buttons])
 city_keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="Москва"), KeyboardButton(text="Питер")],
@@ -87,7 +96,7 @@ async def get_exp(message:types.Message):
     keyword = user_data[user_id]["keyword"]
     area = user_data[user_id]["area"]
 
-    url = f"https://api.hh.ru/vacancies?text={quote(keyword)}&area={area}&experience={experience}&search_field=name"
+    url = f"https://api.hh.ru/vacancies?text={quote(keyword)}&area={area}&experience={experience}&search_field=name&per_page={count}"
    
     headers = {"User-Agent": "Mozilla/5.0"}
     
@@ -97,8 +106,21 @@ async def get_exp(message:types.Message):
         await message.answer("Вакансий не найдено.Попробуйте ввести другое ключевое слово.")
         return
     
-    result = ""
-    for vacancy in data["items"][:count]:
+    user_data[user_id]["vacancies"] = data["items"]
+    user_data[user_id]["page"] = 0
+    await show_page(message,user_id)
+
+async def show_page(message, user_id, edit = False):
+    vacancies = user_data[user_id]["vacancies"]
+    page = user_data[user_id]["page"]
+    total_pages = (len(vacancies) + PAGE_SIZE - 1) // PAGE_SIZE
+
+    start = page * PAGE_SIZE
+    end = start + PAGE_SIZE
+    page_vacancies = vacancies[start:end]
+
+    result = f"Страница {page + 1} из {total_pages}\n\n"
+    for vacancy in page_vacancies:
         name = vacancy["name"]
         link = vacancy["alternate_url"]
         salary = vacancy["salary"]
@@ -119,8 +141,13 @@ async def get_exp(message:types.Message):
             sal_str = "не указана"
         
         result += f"*{name}*\n{sal_str}\n{link}\n\n"
+
+    keyboard = get_pagination_keyboard(page, total_pages)
+    if edit:
+        await message.edit_text(result, parse_mode ="Markdown", reply_markup = keyboard)
+    else:
+        await message.answer(result, parse_mode = "Markdown", reply_markup = keyboard)
     
-    await message.answer(result, parse_mode="Markdown")
 
 @dp.message()
 async def ask_city(message: types.Message):
@@ -129,7 +156,13 @@ async def ask_city(message: types.Message):
         return
     user_data[message.from_user.id] = {"keyword": message.text}
     await message.answer("Выберите город:", reply_markup=city_keyboard )
-
+@dp.callback_query(F.data.startswith("page_"))
+async def handle_pagination(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    page = int(callback.data.split("_")[1])
+    user_data[user_id]["page"] = page
+    await show_page(callback.message, user_id, edit= True)
+    await callback.answer()
         
 async def main():
     await dp.start_polling(bot)
